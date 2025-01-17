@@ -1,18 +1,71 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <err.h>
 
-#define MAXMSGLEN 100
+#include "message.h"
+
+#define MAXMSGLEN 65535
+
+
+// server:
+// getrequest
+// sendresponse
+
+
+void get_request(request* req, int sessfd) {
+	size_t header_len = sizeof(req_header);
+
+	size_t read_cnt = 0;
+	while (read_cnt < header_len) {
+		// convert to char* to do pointer arithmetic
+		read_cnt += recv(sessfd, (char*)req + read_cnt, header_len-read_cnt, 0);
+	}
+
+	read_cnt = 0;
+	fprintf(stderr, "payload length: %ld\n", req->header.payload_len);
+	
+	while (read_cnt < req->header.payload_len)
+	{
+		fprintf(stderr, "try to read payload\n");
+		read_cnt += recv(sessfd, (char*)req + header_len+read_cnt, req->header.payload_len-read_cnt, 0);
+	}
+
+	fprintf(stderr, "server: func: %d, pathname: %s\n", req->header.opcode, req->req.open.pathname);
+	
+}
+
+
+void execute_request(request* req, int sessfd) {
+	switch (req->header.opcode)
+	{
+	case 0:
+		int fd = open(req->req.open.pathname, req->req.open.flags, req->req.open.m);
+		response res = {
+			.header.errno_value = errno, 
+			.header.payload_len = sizeof(union res_union),
+			.res.open.ret_val = fd
+		};
+		size_t len = sizeof(response);
+		send(sessfd, (void*)&res, len, 0);
+		break;
+	default:
+		break;
+	}
+}
 
 int main(int argc, char**argv) {
 	// char *msg="Hello from server";
-	char buf[MAXMSGLEN+1];
+	// char buf[MAXMSGLEN+1];
 	char *serverport;
 	unsigned short port;
 	int sockfd, sessfd, rv;
@@ -35,6 +88,8 @@ int main(int argc, char**argv) {
 	srv.sin_port = htons(port);			// server port
 
 	// bind to our port
+	int opt = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	rv = bind(sockfd, (struct sockaddr*)&srv, sizeof(struct sockaddr));
 	if (rv<0) err(1,0);
 	
@@ -50,14 +105,11 @@ int main(int argc, char**argv) {
 		sessfd = accept(sockfd, (struct sockaddr *)&cli, &sa_size);
 		if (sessfd<0) err(1,0);
 		
-		// get messages and send replies to this client, until it goes away
-		while ( (rv=recv(sessfd, buf, MAXMSGLEN, 0)) > 0) {
-			buf[rv]=0;		// null terminate string to print
-			printf("%s", buf);
-		}
+		request* req = malloc(MAXMSGLEN);
+		get_request(req, sessfd);
+		execute_request(req, sessfd);
 
-		// either client closed connection, or error
-		if (rv<0) err(1,0);
+		free(req);
 		close(sessfd);
 	}
 	

@@ -17,9 +17,17 @@
 #include <string.h>
 #include <err.h>
 
-#define MAXMSGLEN 100
+#include "message.h"
+
+#define MAXMSGLEN 65535
+#define BUFLEN 2048
+#define VERSION 1
+#define INT_SIZE sizeof(int)
 
 int sockfd;
+
+// client
+void makerpc(request* h, response* r);
 
 void initialize_client() {
 	char *serverip;
@@ -73,6 +81,30 @@ void initialize_client() {
 	
 }
 
+
+void makerpc(request* h, response* r) {
+	size_t len = sizeof(h->header) + h->header.payload_len;
+	send(sockfd, (void*)h, len, 0);
+	
+	len = sizeof(response_header);
+	size_t read_cnt = 0;
+	fprintf(stderr, "Expect %lu bytes for header\n", len);
+	while (read_cnt < len) {
+		// convert to char* to do pointer arithmetic
+		read_cnt += recv(sockfd, (char*)r + read_cnt, len-read_cnt, 0);
+		// fprintf(stderr, "Read %lu bytes already\n", read_cnt);
+	}
+
+	size_t payload_len = r->header.payload_len;
+	read_cnt = 0;
+	fprintf(stderr, "Expect %lu bytes for body\n", payload_len);
+	while (read_cnt < payload_len) {
+		// convert to char* to do pointer arithmetic
+		read_cnt += recv(sockfd, (char*)r + len + read_cnt, payload_len - read_cnt, 0);
+		// fprintf(stderr, "Read %lu bytes already\n", read_cnt);
+	}
+}
+
 // The following line declares a function pointer with the same prototype as the open function.  
 int (*orig_open)(const char *pathname, int flags, ...);  // mode_t mode is needed when flags includes O_CREAT
 ssize_t (*orig_read)(int fildes, void *buf, size_t nbyte);
@@ -98,9 +130,23 @@ int open(const char *pathname, int flags, ...) {
 	// we just print a message, then call through to the original open function (from libc)
 	fprintf(stderr, "mylib: open called for path %s\n", pathname);
 
-	char* func_name = "open\n";
-	send(sockfd, func_name, strlen(func_name), 0);
+	int pathname_len = strlen(pathname) + 1;
+	int len = sizeof(request) + pathname_len;
+	request* r = malloc(len);
 
+	r->header.opcode = OPEN;
+	r->header.payload_len = sizeof(open_req) + pathname_len;
+
+	r->req.open.flags = flags;
+	r->req.open.m = m;
+	memcpy(r->req.open.pathname, pathname, pathname_len);
+	
+	response* res = malloc(MAXMSGLEN);
+	makerpc(r, res);
+
+	fprintf(stderr, "mylib: rpc open return value: %d, errno: %d\n", res->res.open.ret_val, res->header.errno_value);
+
+	free(r);
 	return orig_open(pathname, flags, m);
 }
 
