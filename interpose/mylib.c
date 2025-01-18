@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <string.h>
 #include <err.h>
+#include <errno.h>
 
 #include "message.h"
 
@@ -83,7 +84,7 @@ void initialize_client() {
 
 
 void makerpc(request* h, response* r) {
-	size_t len = sizeof(h->header) + h->header.payload_len;
+	size_t len = sizeof(req_header) + h->header.payload_len;
 	send(sockfd, (void*)h, len, 0);
 	
 	len = sizeof(response_header);
@@ -135,7 +136,7 @@ int open(const char *pathname, int flags, ...) {
 	request* r = malloc(len);
 
 	r->header.opcode = OPEN;
-	r->header.payload_len = sizeof(open_req) + pathname_len;
+	r->header.payload_len = sizeof(union req_union) + pathname_len;
 
 	r->req.open.flags = flags;
 	r->req.open.m = m;
@@ -147,7 +148,10 @@ int open(const char *pathname, int flags, ...) {
 	fprintf(stderr, "mylib: rpc open return value: %d, errno: %d\n", res->res.open.ret_val, res->header.errno_value);
 
 	free(r);
-	return orig_open(pathname, flags, m);
+	errno = res->header.errno_value;
+	return res->res.open.ret_val;
+	
+	// return orig_open(pathname, flags, m);
 }
 
 ssize_t read(int fildes, void *buf, size_t nbyte) {
@@ -157,17 +161,50 @@ ssize_t read(int fildes, void *buf, size_t nbyte) {
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
-	char* msg = "write\n";
-	send(sockfd, msg, strlen(msg), 0);
 
-	return orig_write(fd, buf, count);
+	// we just print a message, then call through to the original open function (from libc)
+	fprintf(stderr, "mylib: write called for fd %d\n", fd);
+
+	int len = sizeof(request) + count;
+	request* r = malloc(len);
+
+	r->header.opcode = WRITE;
+	r->header.payload_len = sizeof(union req_union) + count;
+
+	r->req.write.count = count;
+	r->req.write.fd = fd;
+	memcpy(r->req.write.buf, buf, count);
+	
+	response* res = malloc(MAXMSGLEN);
+	makerpc(r, res);
+
+	fprintf(stderr, "mylib: rpc write return val: %lu, errno: %d\n", res->res.write.ret_val, res->header.errno_value);
+
+	free(r);
+
+	errno = res->header.errno_value;
+	return res->res.write.ret_val;
+
+	// return orig_write(fd, buf, count);
 }
 
 int close(int fildes) {
-	char* msg = "close\n";
-	send(sockfd, msg, strlen(msg), 0);
+	// char* msg = "close\n";
+	// send(sockfd, msg, strlen(msg), 0);
 
-	return orig_close(fildes);
+	request r = {
+		.header.opcode = CLOSE,
+		.header.payload_len = sizeof(union req_union),
+		.req.close.fd = fildes
+	};
+
+	response res;
+	makerpc(&r, &res);
+
+	errno = res.header.errno_value;
+	return res.res.close.ret_val;
+
+	// return orig_close(fildes);
 }
 
 int stat(const char *restrict pathname, struct stat *restrict statbuf) {

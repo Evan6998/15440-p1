@@ -1,8 +1,9 @@
 #include <sys/types.h>
 
 enum OPCODE {
-  OPEN = 0,
+  OPEN,
   READ,
+  WRITE,
   CLOSE
 };
 
@@ -19,9 +20,21 @@ typedef struct {
 	char pathname[0];
 } open_req;
 
+typedef struct {
+	int fd; 
+	size_t count;
+	char buf[0];
+} write_req;
+
+
+typedef struct {
+	int fd;
+} close_req;
 
 union req_union {
 	open_req open;
+	write_req write;
+	close_req close;
 };
 
 typedef struct {
@@ -34,8 +47,20 @@ typedef struct
 	int ret_val;
 } open_res;
 
+typedef struct 
+{
+	ssize_t ret_val;
+} write_res;
+
+
+typedef struct {
+	int ret_val;
+} close_res;
+
 union res_union {
 	open_res open;
+	write_res write;
+	close_res close;
 };
 
 typedef struct 

@@ -22,41 +22,66 @@
 // sendresponse
 
 
-void get_request(request* req, int sessfd) {
+int get_request(request* req, int sessfd) {
 	size_t header_len = sizeof(req_header);
 
 	size_t read_cnt = 0;
 	while (read_cnt < header_len) {
 		// convert to char* to do pointer arithmetic
-		read_cnt += recv(sessfd, (char*)req + read_cnt, header_len-read_cnt, 0);
+		ssize_t bytes_received = recv(sessfd, (char*)req + read_cnt, header_len-read_cnt, 0);
+		if (bytes_received <= 0) {
+			return -1;
+		}
+		read_cnt += bytes_received;
 	}
 
 	read_cnt = 0;
-	fprintf(stderr, "payload length: %ld\n", req->header.payload_len);
+	fprintf(stderr, "server: func: %d, payload length: %ld\n", req->header.opcode, req->header.payload_len);
 	
 	while (read_cnt < req->header.payload_len)
 	{
 		fprintf(stderr, "try to read payload\n");
-		read_cnt += recv(sessfd, (char*)req + header_len+read_cnt, req->header.payload_len-read_cnt, 0);
+		ssize_t bytes_received = recv(sessfd, (char*)req + header_len+read_cnt, req->header.payload_len-read_cnt, 0);
+		if (bytes_received <= 0) {
+			return -1;
+		}
+		read_cnt += bytes_received;
 	}
 
 	fprintf(stderr, "server: func: %d, pathname: %s\n", req->header.opcode, req->req.open.pathname);
-	
+	return 0;
 }
 
 
 void execute_request(request* req, int sessfd) {
 	switch (req->header.opcode)
 	{
-	case 0:
+	case OPEN:
 		int fd = open(req->req.open.pathname, req->req.open.flags, req->req.open.m);
-		response res = {
+		response open_res = {
 			.header.errno_value = errno, 
 			.header.payload_len = sizeof(union res_union),
 			.res.open.ret_val = fd
 		};
-		size_t len = sizeof(response);
-		send(sessfd, (void*)&res, len, 0);
+		send(sessfd, (void*)&open_res, sizeof(response), 0);
+		break;
+	case WRITE:
+		ssize_t cnt = write(req->req.write.fd, req->req.write.buf, req->req.write.count);
+		response write_res = {
+			.header.errno_value = errno,
+			.header.payload_len = sizeof(union res_union),
+			.res.write.ret_val = cnt
+		};
+		send(sessfd, (void*)&write_res, sizeof(response), 0);
+		break;
+	case CLOSE:
+		int ret = close(req->req.close.fd);
+		response close_res = {
+			.header.errno_value = errno,
+			.header.payload_len = sizeof(union res_union),
+			.res.close.ret_val = ret
+		};
+		send(sessfd, (void*)&close_res, sizeof(response), 0);
 		break;
 	default:
 		break;
@@ -105,12 +130,19 @@ int main(int argc, char**argv) {
 		sessfd = accept(sockfd, (struct sockaddr *)&cli, &sa_size);
 		if (sessfd<0) err(1,0);
 		
-		request* req = malloc(MAXMSGLEN);
-		get_request(req, sessfd);
-		execute_request(req, sessfd);
+		while (1) {
+			request* req = malloc(MAXMSGLEN);
+			if (get_request(req, sessfd) != 0) {
+				fprintf(stderr, "[server.c] Connection close.\n");
+				free(req);
+				close(sessfd);
+				break;
+			}
+			execute_request(req, sessfd);
+			free(req);
+			fprintf(stderr, "[server.c] Finish one request.\n");
+		}
 
-		free(req);
-		close(sessfd);
 	}
 	
 	// printf("server shutting down cleanly\n");

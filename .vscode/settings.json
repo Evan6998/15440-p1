@@ -7,6 +7,12 @@
         "atomic": "c",
         "*.tcc": "c",
         "fstream": "c",
-        "sstream": "c"
+        "sstream": "c",
+        "exception": "cpp",
+        "memory_resource": "cpp",
+        "iosfwd": "cpp",
+        "new": "cpp",
+        "ostream": "cpp",
+        "streambuf": "cpp"
     }
 }
