@@ -62,6 +62,10 @@ typedef struct {
 	size_t nbytes;
 } direntries_req;
 
+typedef struct {
+	char path[0];
+} dirtree_req;
+
 union req_union {
 	open_req open;
 	read_req read;
@@ -71,6 +75,7 @@ union req_union {
 	stat_req stat;
 	unlink_req unlink;
 	direntries_req direntries;
+	dirtree_req dirtree;
 };
 
 typedef struct {
@@ -116,6 +121,10 @@ typedef struct {
 	char buf[0];
 } direntries_res;
 
+typedef struct {
+	char buf[0];
+} dirtree_res;
+
 union res_union {
 	open_res open;
 	read_res read;
@@ -125,6 +134,7 @@ union res_union {
 	stat_res stat;
 	unlink_res unlink;
 	direntries_res direntries;
+	dirtree_res dirtree;
 };
 
 typedef struct 

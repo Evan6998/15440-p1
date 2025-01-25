@@ -15,6 +15,7 @@
 #include <err.h>
 
 #include "message.h"
+#include "../include/dirtree.h" 
 
 #define MAXMSGLEN 65535
 
@@ -54,6 +55,40 @@ int get_request(request* req, int sessfd) {
 	return 0;
 }
 
+char* serialize_dirtree(struct dirtreenode* root, size_t* size) {
+	if (root == NULL) {
+		fprintf(stderr, "This shouldn't happen\n");
+		exit(255);
+	}
+	char** buffers = malloc(sizeof(char**) * (root->num_subdirs));
+	size_t* lens = malloc(sizeof(size_t) * (root->num_subdirs));
+	size_t subtree_buffer_len = 0;
+	for (int i = 0; i < root->num_subdirs; i++) {
+		size_t nbyte;
+		buffers[i] = serialize_dirtree(root->subdirs[i], &nbyte);
+		lens[i] = nbyte;
+		subtree_buffer_len += nbyte;
+	}
+	size_t entryname_len = strlen(root->name) + 1;
+	size_t total_len = entryname_len + sizeof(int) + subtree_buffer_len;
+	char* res = (char*)malloc(total_len);
+	
+	char* offset = res;
+	memcpy(offset, root->name, entryname_len);
+	offset += entryname_len;
+	memcpy(offset, &root->num_subdirs, sizeof(int));
+	offset += sizeof(int);
+
+	for (int i = 0; i < root->num_subdirs; i++) {
+		memcpy(offset, buffers[i], lens[i]);
+		free(buffers[i]);
+		offset += lens[i];
+	}
+	*size = total_len;
+	
+	free(lens);
+	return res;
+}
 
 void execute_request(request* req, int sessfd) {
 	switch (req->header.opcode)
@@ -132,6 +167,18 @@ void execute_request(request* req, int sessfd) {
 
 		send(sessfd, (void*)r, sizeof(response) + bytes_read, 0);
 		free(r);
+		break;
+	case GETDIRTREE:
+		struct dirtreenode* root = getdirtree(req->req.dirtree.path);
+		size_t tree_nbyte = 0;
+		char* buf = serialize_dirtree(root, &tree_nbyte);
+		response* dirtree_response = malloc(sizeof(response) + tree_nbyte);
+		dirtree_response->header.errno_value = errno;
+		dirtree_response->header.payload_len = sizeof(union res_union) + tree_nbyte;
+		memcpy(dirtree_response->res.dirtree.buf, buf, tree_nbyte);
+
+		send(sessfd, (void*)dirtree_response, sizeof(response) + tree_nbyte, 0);
+		free(dirtree_response);
 		break;
 	default:
 		break;

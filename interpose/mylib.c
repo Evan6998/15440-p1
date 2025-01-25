@@ -19,6 +19,7 @@
 #include <errno.h>
 
 #include "message.h"
+#include "../include/dirtree.h" 
 
 #define MAXMSGLEN 65535
 #define BUFLEN 2048
@@ -299,12 +300,55 @@ ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
 	return ret_val;
 }
 
+
+struct dirtreenode* deserialize_to_dirtree(char* buf, size_t* nbyte) {
+	if (buf == NULL) {
+		fprintf(stderr, "This shouldn't happen\n");
+		exit(255);
+	};
+	struct dirtreenode* tree = malloc(sizeof(struct dirtreenode));
+	char* offset = buf;
+
+	fprintf(stderr, "[mylib.c] Entry name: %s\n", offset);
+	size_t entryname_len = strlen(offset) + 1;
+	tree->name = malloc(entryname_len);
+	memcpy(tree->name, offset, entryname_len);
+	offset += entryname_len;
+
+	tree->num_subdirs = *(int*)offset;
+	offset += sizeof(int);
+
+	tree->subdirs = malloc(tree->num_subdirs * sizeof(struct dirtreenode*));
+	size_t n = 0;
+	for (int i = 0; i < tree->num_subdirs; i++) {
+		tree->subdirs[i] = deserialize_to_dirtree(offset, &n);
+		offset += n;
+	}
+	if (nbyte != NULL) {
+		*nbyte = offset - buf;
+	}
+	return tree;
+}
+
 struct dirtreenode* getdirtree( const char *path ) {
 	fprintf(stderr, "[mylib.c]: getdirtree called for file: %s\n", path);
-	char* msg = "getdirtree\n";
-	send(sockfd, msg, strlen(msg), 0);
 
-	return orig_getdirtree(path);
+	int path_len = strlen(path) + 1;
+	int len = sizeof(request) + path_len;
+	request* r = malloc(len);
+
+	r->header.opcode = GETDIRTREE;
+	r->header.payload_len = sizeof(union req_union) + path_len;
+	memcpy(r->req.dirtree.path, path, path_len);
+
+	response* res = malloc(MAXMSGLEN);
+	makerpc(r, res);
+
+	errno = res->header.errno_value;
+	struct dirtreenode* tree = deserialize_to_dirtree(res->res.dirtree.buf, NULL);
+	free(r);
+	free(res);
+	return tree;
 }
 
 void freedirtree( struct dirtreenode* dt ) {
