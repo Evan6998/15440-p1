@@ -129,7 +129,7 @@ int open(const char *pathname, int flags, ...) {
 	}
 
 	// we just print a message, then call through to the original open function (from libc)
-	fprintf(stderr, "mylib: open called for path %s\n", pathname);
+	fprintf(stderr, "[mylib.c]: open called for path %s\n", pathname);
 
 	int pathname_len = strlen(pathname) + 1;
 	int len = sizeof(request) + pathname_len;
@@ -145,7 +145,7 @@ int open(const char *pathname, int flags, ...) {
 	response* res = malloc(MAXMSGLEN);
 	makerpc(r, res);
 
-	fprintf(stderr, "mylib: rpc open return value: %d, errno: %d\n", res->res.open.ret_val, res->header.errno_value);
+	fprintf(stderr, "[mylib.c]: rpc open return value: %d, errno: %d\n", res->res.open.ret_val, res->header.errno_value);
 
 	free(r);
 	errno = res->header.errno_value;
@@ -155,6 +155,7 @@ int open(const char *pathname, int flags, ...) {
 }
 
 ssize_t read(int fildes, void *buf, size_t nbyte) {
+	fprintf(stderr, "[mylib.c]: read called for fildes %d\n", fildes);
 
 	request r = {
 		.header.opcode = READ,
@@ -175,7 +176,7 @@ ssize_t read(int fildes, void *buf, size_t nbyte) {
 ssize_t write(int fd, const void *buf, size_t count) {
 
 	// we just print a message, then call through to the original open function (from libc)
-	fprintf(stderr, "mylib: write called for fd %d\n", fd);
+	fprintf(stderr, "[mylib.c]: write called for fd %d\n", fd);
 
 	int len = sizeof(request) + count;
 	request* r = malloc(len);
@@ -190,7 +191,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 	response* res = malloc(MAXMSGLEN);
 	makerpc(r, res);
 
-	fprintf(stderr, "mylib: rpc write return val: %lu, errno: %d\n", res->res.write.ret_val, res->header.errno_value);
+	fprintf(stderr, "[mylib.c]: rpc write return val: %lu, errno: %d\n", res->res.write.ret_val, res->header.errno_value);
 
 	free(r);
 
@@ -204,6 +205,7 @@ int close(int fildes) {
 	// char* msg = "close\n";
 	// send(sockfd, msg, strlen(msg), 0);
 
+	fprintf(stderr, "[mylib.c]: close called for fildes %d\n", fildes);
 	request r = {
 		.header.opcode = CLOSE,
 		.header.payload_len = sizeof(union req_union),
@@ -220,6 +222,8 @@ int close(int fildes) {
 }
 
 int stat(const char *restrict pathname, struct stat *restrict statbuf) {
+	fprintf(stderr, "[mylib.c]: stat called for file: %s\n", pathname);
+
 	int pathname_len = strlen(pathname) + 1;
 	int len = sizeof(request) + pathname_len;
 	request* r = malloc(len);
@@ -237,6 +241,7 @@ int stat(const char *restrict pathname, struct stat *restrict statbuf) {
 
 off_t lseek(int fd, off_t offset, int whence) {
 
+	fprintf(stderr, "[mylib.c]: lseek called for fildes %d\n", fd);
 	request r = {
 		.header.opcode = LSEEK,
 		.header.payload_len = sizeof(union req_union),
@@ -254,6 +259,7 @@ off_t lseek(int fd, off_t offset, int whence) {
 }
 
 int unlink(const char *pathname) {
+	fprintf(stderr, "[mylib.c]: unlink called for file: %s\n", pathname);
 	char* msg = "unlink\n";
 	send(sockfd, msg, strlen(msg), 0);
 
@@ -261,6 +267,7 @@ int unlink(const char *pathname) {
 }
 
 ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
+	fprintf(stderr, "[mylib.c]: getdirentries called for fildes %d\n", fd);
 	char* msg = "getdirentries\n";
 	send(sockfd, msg, strlen(msg), 0);
 
@@ -268,6 +275,7 @@ ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
 }
 
 struct dirtreenode* getdirtree( const char *path ) {
+	fprintf(stderr, "[mylib.c]: getdirtree called for file: %s\n", path);
 	char* msg = "getdirtree\n";
 	send(sockfd, msg, strlen(msg), 0);
 
@@ -275,6 +283,7 @@ struct dirtreenode* getdirtree( const char *path ) {
 }
 
 void freedirtree( struct dirtreenode* dt ) {
+	fprintf(stderr, "[mylib.c]: freedirtree called.\n");
 	char* msg = "freedirtree\n";
 	send(sockfd, msg, strlen(msg), 0);
 
@@ -294,7 +303,7 @@ void _init(void) {
 	orig_getdirentries = dlsym(RTLD_NEXT, "getdirentries");
 	orig_getdirtree = dlsym(RTLD_NEXT, "getdirtree");
 	orig_freedirtree = dlsym(RTLD_NEXT, "freedirtree");
-	fprintf(stderr, "Init mylib\n");
+	fprintf(stderr, "[mylib.c] Init mylib\n");
 
 	initialize_client();
 }
