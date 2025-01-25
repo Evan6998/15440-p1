@@ -65,6 +65,16 @@ void execute_request(request* req, int sessfd) {
 		};
 		send(sessfd, (void*)&open_res, sizeof(response), 0);
 		break;
+	case READ:
+		response* read_response = malloc(MAXMSGLEN);
+		size_t nbyte = read(req->req.read.fildes, read_response->res.read.buf, req->req.read.nbyte);
+		
+		read_response->header.errno_value = errno;
+		read_response->header.payload_len = sizeof(union res_union) + nbyte;
+		read_response->res.read.nbyte = nbyte;
+
+		send(sessfd, (void*)read_response, sizeof(response) + nbyte, 0);
+		break;
 	case WRITE:
 		ssize_t cnt = write(req->req.write.fd, req->req.write.buf, req->req.write.count);
 		response write_res = {

@@ -21,6 +21,12 @@ typedef struct {
 } open_req;
 
 typedef struct {
+	int fildes;
+	// void *buf;
+	size_t nbyte;
+} read_req;
+
+typedef struct {
 	int fd; 
 	size_t count;
 	char buf[0];
@@ -33,6 +39,7 @@ typedef struct {
 
 union req_union {
 	open_req open;
+	read_req read;
 	write_req write;
 	close_req close;
 };
@@ -52,6 +59,10 @@ typedef struct
 	ssize_t ret_val;
 } write_res;
 
+typedef struct {
+	size_t nbyte;
+	char buf[0];
+} read_res;
 
 typedef struct {
 	int ret_val;
@@ -59,6 +70,7 @@ typedef struct {
 
 union res_union {
 	open_res open;
+	read_res read;
 	write_res write;
 	close_res close;
 };

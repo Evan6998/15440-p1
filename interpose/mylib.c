@@ -155,9 +155,21 @@ int open(const char *pathname, int flags, ...) {
 }
 
 ssize_t read(int fildes, void *buf, size_t nbyte) {
-	char* func_name = "read\n";
-	send(sockfd, func_name, strlen(func_name), 0);
-	return orig_read(fildes, buf, nbyte);
+
+	request r = {
+		.header.opcode = READ,
+		.header.payload_len = sizeof(union req_union),
+		.req.read.fildes = fildes,
+		.req.read.nbyte = nbyte,
+	};
+
+	response* res = malloc(MAXMSGLEN);
+	makerpc(&r, res);
+
+	size_t read_size = res->res.read.nbyte;
+	memcpy(buf, res->res.read.buf, read_size);
+	errno = res->header.errno_value;
+	return read_size;
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
