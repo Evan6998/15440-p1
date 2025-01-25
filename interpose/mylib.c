@@ -150,7 +150,9 @@ int open(const char *pathname, int flags, ...) {
 
 	free(r);
 	errno = res->header.errno_value;
-	return res->res.open.ret_val;
+	int ret_val = res->res.open.ret_val;
+	free(res);
+	return ret_val;
 	
 	// return orig_open(pathname, flags, m);
 }
@@ -171,6 +173,7 @@ ssize_t read(int fildes, void *buf, size_t nbyte) {
 	size_t read_size = res->res.read.nbyte;
 	memcpy(buf, res->res.read.buf, read_size);
 	errno = res->header.errno_value;
+	free(res);
 	return read_size;
 }
 
@@ -197,7 +200,9 @@ ssize_t write(int fd, const void *buf, size_t count) {
 	free(r);
 
 	errno = res->header.errno_value;
-	return res->res.write.ret_val;
+	int ret_val = res->res.write.ret_val;
+	free(res);
+	return ret_val;
 
 	// return orig_write(fd, buf, count);
 }
@@ -238,6 +243,7 @@ int stat(const char *restrict pathname, struct stat *restrict statbuf) {
 
 	errno = res.header.errno_value;
 	memcpy(statbuf, &res.res.stat.statbuf, sizeof(struct stat));
+	free(r);
 	return res.res.stat.ret_val;
 }
 

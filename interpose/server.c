@@ -85,7 +85,7 @@ char* serialize_dirtree(struct dirtreenode* root, size_t* size) {
 		offset += lens[i];
 	}
 	*size = total_len;
-	
+	free(buffers);
 	free(lens);
 	return res;
 }
@@ -111,6 +111,7 @@ void execute_request(request* req, int sessfd) {
 		read_response->res.read.nbyte = nbyte;
 
 		send(sessfd, (void*)read_response, sizeof(response) + nbyte, 0);
+		free(read_response);
 		break;
 	case WRITE:
 		ssize_t cnt = write(req->req.write.fd, req->req.write.buf, req->req.write.count);
