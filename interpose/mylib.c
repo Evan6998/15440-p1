@@ -235,6 +235,7 @@ int stat(const char *restrict pathname, struct stat *restrict statbuf) {
 	response res;
 	makerpc(r, &res);
 
+	errno = res.header.errno_value;
 	memcpy(statbuf, &res.res.stat.statbuf, sizeof(struct stat));
 	return res.res.stat.ret_val;
 }
@@ -259,11 +260,20 @@ off_t lseek(int fd, off_t offset, int whence) {
 }
 
 int unlink(const char *pathname) {
-	fprintf(stderr, "[mylib.c]: unlink called for file: %s\n", pathname);
-	char* msg = "unlink\n";
-	send(sockfd, msg, strlen(msg), 0);
+	int pathname_len = strlen(pathname) + 1;
+	int len = sizeof(request) + pathname_len;
+	request* r = malloc(len);
 
-	return orig_unlink(pathname);
+	r->header.opcode = UNLINK;
+	r->header.payload_len = sizeof(union req_union) + pathname_len;
+	memcpy(r->req.unlink.pathname, pathname, pathname_len);
+
+	response res;
+	makerpc(r, &res);
+
+	errno = res.header.errno_value;
+	free(r);
+	return res.res.unlink.ret_val;
 }
 
 ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {

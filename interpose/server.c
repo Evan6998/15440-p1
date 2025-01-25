@@ -49,7 +49,7 @@ int get_request(request* req, int sessfd) {
 		read_cnt += bytes_received;
 	}
 
-	fprintf(stderr, "server: func: %d, pathname: %s\n", req->header.opcode, req->req.open.pathname);
+	fprintf(stderr, "server: func: %d\n", req->header.opcode);
 	return 0;
 }
 
@@ -110,6 +110,16 @@ void execute_request(request* req, int sessfd) {
 		stat_response.header.errno_value = errno;
 		stat_response.header.payload_len = sizeof(union res_union);
 		send(sessfd, (void*)&stat_response, sizeof(response), 0);
+		break;
+	case UNLINK:
+		int ret_val = unlink(req->req.unlink.pathname);
+		response unlink_response = {
+			.header.errno_value = errno,
+			.header.payload_len = sizeof(union res_union),
+
+			.res.unlink.ret_val = ret_val,
+		};
+		send(sessfd, (void*)&unlink_response, sizeof(response), 0);
 		break;
 	default:
 		break;

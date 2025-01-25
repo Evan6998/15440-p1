@@ -53,6 +53,10 @@ typedef struct {
 	char pathname[0];
 } stat_req;
 
+typedef struct {
+	char pathname[0];
+} unlink_req;
+
 union req_union {
 	open_req open;
 	read_req read;
@@ -60,6 +64,7 @@ union req_union {
 	close_req close;
 	lseek_req lseek;
 	stat_req stat;
+	unlink_req unlink;
 };
 
 typedef struct {
@@ -95,6 +100,10 @@ typedef struct {
 	struct stat statbuf;
 } stat_res;
 
+typedef struct {
+	int ret_val;
+} unlink_res;
+
 union res_union {
 	open_res open;
 	read_res read;
@@ -102,6 +111,7 @@ union res_union {
 	close_res close;
 	lseek_res lseek;
 	stat_res stat;
+	unlink_res unlink;
 };
 
 typedef struct 
