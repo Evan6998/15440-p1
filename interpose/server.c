@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -102,6 +103,13 @@ void execute_request(request* req, int sessfd) {
 			.res.lseek.off = off,
 		};
 		send(sessfd, (void*)&lseek_response, sizeof(response), 0);
+		break;
+	case STAT:
+		response stat_response;
+		stat_response.res.stat.ret_val = stat(req->req.stat.pathname, &stat_response.res.stat.statbuf);
+		stat_response.header.errno_value = errno;
+		stat_response.header.payload_len = sizeof(union res_union);
+		send(sessfd, (void*)&stat_response, sizeof(response), 0);
 		break;
 	default:
 		break;

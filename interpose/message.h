@@ -49,12 +49,17 @@ typedef struct {
 	int whence;
 } lseek_req;
 
+typedef struct {
+	char pathname[0];
+} stat_req;
+
 union req_union {
 	open_req open;
 	read_req read;
 	write_req write;
 	close_req close;
 	lseek_req lseek;
+	stat_req stat;
 };
 
 typedef struct {
@@ -85,12 +90,18 @@ typedef struct {
 	off_t off;
 } lseek_res;
 
+typedef struct {
+	int ret_val;
+	struct stat statbuf;
+} stat_res;
+
 union res_union {
 	open_res open;
 	read_res read;
 	write_res write;
 	close_res close;
 	lseek_res lseek;
+	stat_res stat;
 };
 
 typedef struct 

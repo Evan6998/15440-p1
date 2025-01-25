@@ -220,10 +220,19 @@ int close(int fildes) {
 }
 
 int stat(const char *restrict pathname, struct stat *restrict statbuf) {
-	char* msg = "stat\n";
-	send(sockfd, msg, strlen(msg), 0);
+	int pathname_len = strlen(pathname) + 1;
+	int len = sizeof(request) + pathname_len;
+	request* r = malloc(len);
 
-	return orig_stat(pathname, statbuf);
+	r->header.opcode = STAT;
+	r->header.payload_len = sizeof(union req_union) + pathname_len;
+	memcpy(r->req.stat.pathname, pathname, pathname_len);
+
+	response res;
+	makerpc(r, &res);
+
+	memcpy(statbuf, &res.res.stat.statbuf, sizeof(struct stat));
+	return res.res.stat.ret_val;
 }
 
 off_t lseek(int fd, off_t offset, int whence) {
