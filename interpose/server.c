@@ -149,18 +149,23 @@ int main(int argc, char**argv) {
 		sa_size = sizeof(struct sockaddr_in);
 		sessfd = accept(sockfd, (struct sockaddr *)&cli, &sa_size);
 		if (sessfd<0) err(1,0);
-		
-		while (1) {
-			request* req = malloc(MAXMSGLEN);
-			if (get_request(req, sessfd) != 0) {
-				fprintf(stderr, "[server.c] Connection close.\n");
+		if (fork() == 0) {
+			// child
+			close(sockfd);
+			while (1) {
+				request* req = malloc(MAXMSGLEN);
+				if (get_request(req, sessfd) != 0) {
+					fprintf(stderr, "[server.c] Connection close.\n");
+					free(req);
+					close(sessfd);
+					break;
+				}
+				execute_request(req, sessfd);
 				free(req);
-				close(sessfd);
-				break;
+				fprintf(stderr, "[server.c] Finish one request.\n");
 			}
-			execute_request(req, sessfd);
-			free(req);
-			fprintf(stderr, "[server.c] Finish one request.\n");
+			close(sessfd);
+			exit(0);
 		}
 
 	}
