@@ -227,10 +227,21 @@ int stat(const char *restrict pathname, struct stat *restrict statbuf) {
 }
 
 off_t lseek(int fd, off_t offset, int whence) {
-	char* msg = "lseek\n";
-	send(sockfd, msg, strlen(msg), 0);
 
-	return orig_lseek(fd, offset, whence);
+	request r = {
+		.header.opcode = LSEEK,
+		.header.payload_len = sizeof(union req_union),
+		
+		.req.lseek.fd = fd,
+		.req.lseek.offset = offset,
+		.req.lseek.whence = whence,
+	};
+
+	response res;
+	makerpc(&r, &res);
+
+	errno = res.header.errno_value;
+	return res.res.lseek.off;
 }
 
 int unlink(const char *pathname) {

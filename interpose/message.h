@@ -4,7 +4,13 @@ enum OPCODE {
   OPEN,
   READ,
   WRITE,
-  CLOSE
+  CLOSE,
+  LSEEK,
+  STAT,
+  UNLINK,
+  GETDIRENTRIES,
+  GETDIRTREE,
+  FREEDIRTREE,
 };
 
 typedef struct {
@@ -37,11 +43,18 @@ typedef struct {
 	int fd;
 } close_req;
 
+typedef struct {
+	int fd;
+	off_t offset;
+	int whence;
+} lseek_req;
+
 union req_union {
 	open_req open;
 	read_req read;
 	write_req write;
 	close_req close;
+	lseek_req lseek;
 };
 
 typedef struct {
@@ -68,11 +81,16 @@ typedef struct {
 	int ret_val;
 } close_res;
 
+typedef struct {
+	off_t off;
+} lseek_res;
+
 union res_union {
 	open_res open;
 	read_res read;
 	write_res write;
 	close_res close;
+	lseek_res lseek;
 };
 
 typedef struct 

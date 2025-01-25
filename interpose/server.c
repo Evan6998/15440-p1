@@ -93,6 +93,16 @@ void execute_request(request* req, int sessfd) {
 		};
 		send(sessfd, (void*)&close_res, sizeof(response), 0);
 		break;
+	case LSEEK:
+		off_t off = lseek(req->req.lseek.fd, req->req.lseek.offset, req->req.lseek.whence);
+		response lseek_response = {
+			.header.errno_value = errno,
+			.header.payload_len = sizeof(union res_union),
+			
+			.res.lseek.off = off,
+		};
+		send(sessfd, (void*)&lseek_response, sizeof(response), 0);
+		break;
 	default:
 		break;
 	}
