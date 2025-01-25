@@ -89,7 +89,7 @@ void makerpc(request* h, response* r) {
 	
 	len = sizeof(response_header);
 	size_t read_cnt = 0;
-	fprintf(stderr, "Expect %lu bytes for header\n", len);
+	fprintf(stderr, "[mylib.c] Expect %lu bytes for header\n", len);
 	while (read_cnt < len) {
 		// convert to char* to do pointer arithmetic
 		read_cnt += recv(sockfd, (char*)r + read_cnt, len-read_cnt, 0);
@@ -98,7 +98,7 @@ void makerpc(request* h, response* r) {
 
 	size_t payload_len = r->header.payload_len;
 	read_cnt = 0;
-	fprintf(stderr, "Expect %lu bytes for body\n", payload_len);
+	fprintf(stderr, "[mylib.c] Expect %lu bytes for body\n", payload_len);
 	while (read_cnt < payload_len) {
 		// convert to char* to do pointer arithmetic
 		read_cnt += recv(sockfd, (char*)r + len + read_cnt, payload_len - read_cnt, 0);
@@ -278,10 +278,25 @@ int unlink(const char *pathname) {
 
 ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
 	fprintf(stderr, "[mylib.c]: getdirentries called for fildes %d\n", fd);
-	char* msg = "getdirentries\n";
-	send(sockfd, msg, strlen(msg), 0);
 
-	return orig_getdirentries(fd, buf, nbytes, basep);
+	request req = {
+		.header.opcode = GETDIRENTRIES,
+		.header.payload_len = sizeof(union req_union),
+		.req.direntries.fd = fd,
+		.req.direntries.nbytes = nbytes,
+	};
+	
+	response* res = malloc(MAXMSGLEN);
+	makerpc(&req, res);
+
+	errno = res->header.errno_value;
+	ssize_t ret_val;
+	if ((ret_val = res->res.direntries.ret_val) > 0) {
+		memcpy(buf, res->res.direntries.buf, ret_val);
+		*basep = res->res.direntries.basep;
+	}
+	free(res);
+	return ret_val;
 }
 
 struct dirtreenode* getdirtree( const char *path ) {

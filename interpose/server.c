@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -120,6 +121,17 @@ void execute_request(request* req, int sessfd) {
 			.res.unlink.ret_val = ret_val,
 		};
 		send(sessfd, (void*)&unlink_response, sizeof(response), 0);
+		break;
+	case GETDIRENTRIES:
+		response* r = malloc(sizeof(response) + req->req.direntries.nbytes);
+		ssize_t bytes_read = getdirentries(req->req.direntries.fd, r->res.direntries.buf, req->req.direntries.nbytes, &r->res.direntries.basep);
+		
+		r->header.errno_value = errno;
+		r->header.payload_len = sizeof(union res_union) + bytes_read;
+		r->res.direntries.ret_val = bytes_read;
+
+		send(sessfd, (void*)r, sizeof(response) + bytes_read, 0);
+		free(r);
 		break;
 	default:
 		break;

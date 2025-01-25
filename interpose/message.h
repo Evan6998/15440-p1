@@ -57,6 +57,11 @@ typedef struct {
 	char pathname[0];
 } unlink_req;
 
+typedef struct {
+	int fd;
+	size_t nbytes;
+} direntries_req;
+
 union req_union {
 	open_req open;
 	read_req read;
@@ -65,6 +70,7 @@ union req_union {
 	lseek_req lseek;
 	stat_req stat;
 	unlink_req unlink;
+	direntries_req direntries;
 };
 
 typedef struct {
@@ -104,6 +110,12 @@ typedef struct {
 	int ret_val;
 } unlink_res;
 
+typedef struct {
+	ssize_t ret_val;
+	off_t basep;
+	char buf[0];
+} direntries_res;
+
 union res_union {
 	open_res open;
 	read_res read;
@@ -112,6 +124,7 @@ union res_union {
 	lseek_res lseek;
 	stat_res stat;
 	unlink_res unlink;
+	direntries_res direntries;
 };
 
 typedef struct 
