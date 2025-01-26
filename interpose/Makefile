@@ -18,3 +18,6 @@ mylib.so: mylib.o
 # Clean rule
 clean:
 	rm -f *.o *.so $(PROGS)
+
+format:
+	clang-format -i *.c *.h
