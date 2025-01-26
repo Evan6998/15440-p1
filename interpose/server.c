@@ -90,6 +90,16 @@ char* serialize_dirtree(struct dirtreenode* root, size_t* size) {
 	return res;
 }
 
+void recursive_free( struct dirtreenode* dt ) {
+	if (dt == NULL) return;
+	for (int i = 0; i < dt->num_subdirs; i++) {
+		recursive_free(dt->subdirs[i]);
+	}
+	free(dt->name);
+	free(dt->subdirs);
+	free(dt);
+}
+
 void execute_request(request* req, int sessfd) {
 	switch (req->header.opcode)
 	{
@@ -178,6 +188,10 @@ void execute_request(request* req, int sessfd) {
 		dirtree_response->header.payload_len = sizeof(union res_union) + tree_nbyte;
 		memcpy(dirtree_response->res.dirtree.buf, buf, tree_nbyte);
 		free(buf);
+
+		recursive_free(root);
+		root = NULL;
+		freedirtree(root);
 
 		send(sessfd, (void*)dirtree_response, sizeof(response) + tree_nbyte, 0);
 		free(dirtree_response);

@@ -107,7 +107,7 @@ void makerpc(request* h, response* r) {
 	
 	len = sizeof(response_header);
 	size_t read_cnt = 0;
-	fprintf(stderr, "[mylib.c] Expect %lu bytes for header\n", len);
+	// fprintf(stderr, "[mylib.c] Expect %lu bytes for header\n", len);
 	while (read_cnt < len) {
 		// convert to char* to do pointer arithmetic
 		read_cnt += recv(sockfd, (char*)r + read_cnt, len-read_cnt, 0);
@@ -116,7 +116,7 @@ void makerpc(request* h, response* r) {
 
 	size_t payload_len = r->header.payload_len;
 	read_cnt = 0;
-	fprintf(stderr, "[mylib.c] Expect %lu bytes for body\n", payload_len);
+	// fprintf(stderr, "[mylib.c] Expect %lu bytes for body\n", payload_len);
 	while (read_cnt < payload_len) {
 		// convert to char* to do pointer arithmetic
 		read_cnt += recv(sockfd, (char*)r + len + read_cnt, payload_len - read_cnt, 0);
@@ -147,7 +147,7 @@ int open(const char *pathname, int flags, ...) {
 	}
 
 	// we just print a message, then call through to the original open function (from libc)
-	fprintf(stderr, "[mylib.c]: open called for path %s\n", pathname);
+	// fprintf(stderr, "[mylib.c]: open called for path %s\n", pathname);
 
 	int pathname_len = strlen(pathname) + 1;
 	int len = sizeof(request) + pathname_len;
@@ -361,7 +361,7 @@ struct dirtreenode* deserialize_to_dirtree(char* buf, size_t* nbyte) {
 	struct dirtreenode* tree = malloc(sizeof(struct dirtreenode));
 	char* offset = buf;
 
-	fprintf(stderr, "[mylib.c] Entry name: %s\n", offset);
+	// fprintf(stderr, "[mylib.c] Entry name: %s\n", offset);
 	size_t entryname_len = strlen(offset) + 1;
 	tree->name = malloc(entryname_len);
 	memcpy(tree->name, offset, entryname_len);
