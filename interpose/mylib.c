@@ -21,15 +21,32 @@
 #include "message.h"
 #include "../include/dirtree.h" 
 
-#define MAXMSGLEN 65535
+#define MAXMSGLEN 1048575
 #define BUFLEN 2048
 #define VERSION 1
 #define INT_SIZE sizeof(int)
+#define REMOTE_FD 32768
+#define MAXIMUM_FD 65536
 
 int sockfd;
+int open_fds[MAXIMUM_FD] = {0};
 
 // client
 void makerpc(request* h, response* r);
+
+int remote_fd(int fd) {
+	if (fd >= REMOTE_FD) 
+	{
+		int real_fd = fd - REMOTE_FD;
+		if (real_fd >= MAXIMUM_FD) {
+			fprintf(stderr, "please consider to add MAXIMUM_FD\n");
+			exit(1);
+		}
+		if (open_fds[real_fd])
+			return 1;
+	}
+	return 0;
+}
 
 void initialize_client() {
 	char *serverip;
@@ -152,13 +169,22 @@ int open(const char *pathname, int flags, ...) {
 	errno = res->header.errno_value;
 	int ret_val = res->res.open.ret_val;
 	free(res);
-	return ret_val;
+	if (ret_val == -1) {
+		return ret_val;
+	}
+	open_fds[ret_val] = 1;
+	return ret_val + REMOTE_FD;
 	
 	// return orig_open(pathname, flags, m);
 }
 
 ssize_t read(int fildes, void *buf, size_t nbyte) {
 	fprintf(stderr, "[mylib.c]: read called for fildes %d\n", fildes);
+
+	if (!remote_fd(fildes)) {
+		return orig_read(fildes, buf, nbyte);
+	}
+	fildes -= REMOTE_FD;
 
 	request r = {
 		.header.opcode = READ,
@@ -180,7 +206,12 @@ ssize_t read(int fildes, void *buf, size_t nbyte) {
 ssize_t write(int fd, const void *buf, size_t count) {
 
 	// we just print a message, then call through to the original open function (from libc)
-	fprintf(stderr, "[mylib.c]: write called for fd %d\n", fd);
+	fprintf(stderr, "[mylib.c]: write called for fd %d, size: %lu \n", fd, count);
+
+	if (!remote_fd(fd)) {
+		return orig_write(fd, buf, count);
+	}
+	fd -= REMOTE_FD;
 
 	int len = sizeof(request) + count;
 	request* r = malloc(len);
@@ -211,6 +242,11 @@ int close(int fildes) {
 	// char* msg = "close\n";
 	// send(sockfd, msg, strlen(msg), 0);
 
+	if(!remote_fd(fildes)) {
+		return orig_close(fildes);
+	}
+	fildes -= REMOTE_FD;
+
 	fprintf(stderr, "[mylib.c]: close called for fildes %d\n", fildes);
 	request r = {
 		.header.opcode = CLOSE,
@@ -222,6 +258,7 @@ int close(int fildes) {
 	makerpc(&r, &res);
 
 	errno = res.header.errno_value;
+	open_fds[fildes] = 0;
 	return res.res.close.ret_val;
 
 	// return orig_close(fildes);
@@ -250,6 +287,10 @@ int stat(const char *restrict pathname, struct stat *restrict statbuf) {
 off_t lseek(int fd, off_t offset, int whence) {
 
 	fprintf(stderr, "[mylib.c]: lseek called for fildes %d\n", fd);
+	if (!remote_fd(fd)) {
+		return orig_lseek(fd, offset, whence);
+	}
+	fd -= REMOTE_FD;
 	request r = {
 		.header.opcode = LSEEK,
 		.header.payload_len = sizeof(union req_union),
@@ -285,6 +326,11 @@ int unlink(const char *pathname) {
 
 ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
 	fprintf(stderr, "[mylib.c]: getdirentries called for fildes %d\n", fd);
+
+	// if (!remote_fd(fd)) {
+	// 	return orig_getdirentries(fd, buf, nbytes, basep);
+	// }
+	fd -= REMOTE_FD;
 
 	request req = {
 		.header.opcode = GETDIRENTRIES,
@@ -357,11 +403,20 @@ struct dirtreenode* getdirtree( const char *path ) {
 	return tree;
 }
 
+void recursive_free( struct dirtreenode* dt ) {
+	if (dt == NULL) return;
+	for (int i = 0; i < dt->num_subdirs; i++) {
+		recursive_free(dt->subdirs[i]);
+	}
+	free(dt->name);
+	free(dt->subdirs);
+	free(dt);
+}
+
 void freedirtree( struct dirtreenode* dt ) {
 	fprintf(stderr, "[mylib.c]: freedirtree called.\n");
-	char* msg = "freedirtree\n";
-	send(sockfd, msg, strlen(msg), 0);
-
+	recursive_free(dt);
+	dt = NULL;
 	return orig_freedirtree(dt);
 }
 

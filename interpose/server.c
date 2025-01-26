@@ -17,7 +17,7 @@
 #include "message.h"
 #include "../include/dirtree.h" 
 
-#define MAXMSGLEN 65535
+#define MAXMSGLEN 1048575
 
 
 // server:
@@ -60,7 +60,7 @@ char* serialize_dirtree(struct dirtreenode* root, size_t* size) {
 		fprintf(stderr, "This shouldn't happen\n");
 		exit(255);
 	}
-	char** buffers = malloc(sizeof(char**) * (root->num_subdirs));
+	char** buffers = malloc(sizeof(char*) * (root->num_subdirs));
 	size_t* lens = malloc(sizeof(size_t) * (root->num_subdirs));
 	size_t subtree_buffer_len = 0;
 	for (int i = 0; i < root->num_subdirs; i++) {
@@ -177,6 +177,7 @@ void execute_request(request* req, int sessfd) {
 		dirtree_response->header.errno_value = errno;
 		dirtree_response->header.payload_len = sizeof(union res_union) + tree_nbyte;
 		memcpy(dirtree_response->res.dirtree.buf, buf, tree_nbyte);
+		free(buf);
 
 		send(sessfd, (void*)dirtree_response, sizeof(response) + tree_nbyte, 0);
 		free(dirtree_response);
