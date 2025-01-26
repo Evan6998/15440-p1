@@ -1,3 +1,28 @@
+/**
+ * @file mylib.c
+ * @brief Implements an RPC-based interposition library for remote file
+ * operations.
+ *
+ * This library intercepts standard file system calls (e.g., open, read, write,
+ * close, stat, unlink, etc.) and redirects them to a remote file server via an
+ * RPC mechanism. It dynamically replaces standard system calls using function
+ * interposition with `dlsym()`, enabling transparent remote file access.
+ *
+ * Features:
+ * - **RPC Communication**: Uses `makerpc()` to send requests and receive
+ * responses.
+ * - **Remote File Descriptors**: Tracks remote file descriptors using
+ * `open_fds[]`.
+ * - **Client Initialization**: Connects to the file server based on environment
+ * variables.
+ * - **Function Interposition**: Overrides system calls via `dlsym(RTLD_NEXT)`.
+ * - **Directory Tree Handling**: Supports `getdirtree()` and `freedirtree()`.
+ *
+ * The `_init()` function initializes the library, setting up function pointers
+ * and establishing a connection to the remote server. The implementation
+ * ensures compatibility with standard file operations while providing seamless
+ * remote access.
+ */
 #define _GNU_SOURCE
 
 #include <dlfcn.h>
@@ -51,12 +76,9 @@ void initialize_client() {
   char *serverip;
   char *serverport;
   unsigned short port;
-  // char *msg="Hello from client";
-  // char buf[MAXMSGLEN+1];
   int rv;
   struct sockaddr_in srv;
 
-  // Get environment variable indicating the ip address of the server
   serverip = getenv("server15440");
   if (serverip)
     fprintf(stderr, "Got environment variable server15440: %s\n", serverip);
@@ -66,7 +88,6 @@ void initialize_client() {
     serverip = "127.0.0.1";
   }
 
-  // Get environment variable indicating the port of the server
   serverport = getenv("serverport15440");
   if (serverport)
     fprintf(stderr, "Got environment variable serverport15440: %s\n",
@@ -78,32 +99,18 @@ void initialize_client() {
   }
   port = (unsigned short)atoi(serverport);
 
-  // Create socket
-  sockfd = socket(AF_INET, SOCK_STREAM, 0); // TCP/IP socket
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0)
-    err(1, 0); // in case of error
+    err(1, 0);
 
-  // setup address structure to point to server
-  memset(&srv, 0, sizeof(srv));              // clear it first
-  srv.sin_family = AF_INET;                  // IP family
-  srv.sin_addr.s_addr = inet_addr(serverip); // IP address of server
-  srv.sin_port = htons(port);                // server port
+  memset(&srv, 0, sizeof(srv));
+  srv.sin_family = AF_INET;
+  srv.sin_addr.s_addr = inet_addr(serverip);
+  srv.sin_port = htons(port);
 
-  // actually connect to the server
   rv = connect(sockfd, (struct sockaddr *)&srv, sizeof(struct sockaddr));
   if (rv < 0)
     err(1, 0);
-
-  // // send message to server
-  // printf("client sending to server: %s\n", msg);
-  // send(sockfd, msg, strlen(msg), 0);	// send message; should check return
-  // value
-
-  // // get message back
-  // rv = recv(sockfd, buf, MAXMSGLEN, 0);	// get message
-  // if (rv<0) err(1,0);			// in case something went wrong
-  // buf[rv]=0;				// null terminate string to print
-  // printf("client got messge: %s\n", buf);
 }
 
 void makerpc(request *h, response *r) {
@@ -112,21 +119,15 @@ void makerpc(request *h, response *r) {
 
   len = sizeof(response_header);
   size_t read_cnt = 0;
-  // fprintf(stderr, "[mylib.c] Expect %lu bytes for header\n", len);
   while (read_cnt < len) {
-    // convert to char* to do pointer arithmetic
     read_cnt += recv(sockfd, (char *)r + read_cnt, len - read_cnt, 0);
-    // fprintf(stderr, "Read %lu bytes already\n", read_cnt);
   }
 
   size_t payload_len = r->header.payload_len;
   read_cnt = 0;
-  // fprintf(stderr, "[mylib.c] Expect %lu bytes for body\n", payload_len);
   while (read_cnt < payload_len) {
-    // convert to char* to do pointer arithmetic
     read_cnt +=
         recv(sockfd, (char *)r + len + read_cnt, payload_len - read_cnt, 0);
-    // fprintf(stderr, "Read %lu bytes already\n", read_cnt);
   }
 }
 
@@ -155,10 +156,6 @@ int open(const char *pathname, int flags, ...) {
     va_end(a);
   }
 
-  // we just print a message, then call through to the original open function
-  // (from libc) fprintf(stderr, "[mylib.c]: open called for path %s\n",
-  // pathname);
-
   int pathname_len = strlen(pathname) + 1;
   int len = sizeof(request) + pathname_len;
   request *r = malloc(len);
@@ -185,8 +182,6 @@ int open(const char *pathname, int flags, ...) {
   }
   open_fds[ret_val] = 1;
   return ret_val + REMOTE_FD;
-
-  // return orig_open(pathname, flags, m);
 }
 
 ssize_t read(int fildes, void *buf, size_t nbyte) {
@@ -216,8 +211,6 @@ ssize_t read(int fildes, void *buf, size_t nbyte) {
 
 ssize_t write(int fd, const void *buf, size_t count) {
 
-  // we just print a message, then call through to the original open function
-  // (from libc)
   fprintf(stderr, "[mylib.c]: write called for fd %d, size: %lu \n", fd, count);
 
   if (!remote_fd(fd)) {
@@ -247,13 +240,9 @@ ssize_t write(int fd, const void *buf, size_t count) {
   int ret_val = res->res.write.ret_val;
   free(res);
   return ret_val;
-
-  // return orig_write(fd, buf, count);
 }
 
 int close(int fildes) {
-  // char* msg = "close\n";
-  // send(sockfd, msg, strlen(msg), 0);
 
   if (!remote_fd(fildes)) {
     return orig_close(fildes);
@@ -271,8 +260,6 @@ int close(int fildes) {
   errno = res.header.errno_value;
   open_fds[fildes] = 0;
   return res.res.close.ret_val;
-
-  // return orig_close(fildes);
 }
 
 int stat(const char *restrict pathname, struct stat *restrict statbuf) {
@@ -338,9 +325,6 @@ int unlink(const char *pathname) {
 ssize_t getdirentries(int fd, char *buf, size_t nbytes, off_t *restrict basep) {
   fprintf(stderr, "[mylib.c]: getdirentries called for fildes %d\n", fd);
 
-  // if (!remote_fd(fd)) {
-  // 	return orig_getdirentries(fd, buf, nbytes, basep);
-  // }
   fd -= REMOTE_FD;
 
   request req = {
@@ -371,7 +355,6 @@ struct dirtreenode *deserialize_to_dirtree(char *buf, size_t *nbyte) {
   struct dirtreenode *tree = malloc(sizeof(struct dirtreenode));
   char *offset = buf;
 
-  // fprintf(stderr, "[mylib.c] Entry name: %s\n", offset);
   size_t entryname_len = strlen(offset) + 1;
   tree->name = malloc(entryname_len);
   memcpy(tree->name, offset, entryname_len);

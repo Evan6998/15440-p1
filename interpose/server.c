@@ -1,3 +1,25 @@
+/**
+ * @file server.c
+ * @brief Implements an RPC-based file server handling remote file operations.
+ *
+ * This server receives file operation requests from clients via TCP, processes
+ * them locally, and sends responses back. It supports operations such as
+ * open, read, write, close, stat, unlink, and directory traversal.
+ *
+ * Features:
+ * - **Request Handling**: Uses `get_request()` to read incoming RPC requests.
+ * - **Response Transmission**: Sends results back using `send()`.
+ * - **Directory Tree Serialization**: Implements `serialize_dirtree()` to
+ * convert hierarchical directory structures into a serialized format.
+ * - **Concurrent Processing**: Uses `fork()` to handle multiple clients.
+ * - **Socket Management**: Listens for incoming connections and processes them
+ * in a loop.
+ *
+ * The `main()` function initializes the server, binds to the specified port,
+ * and listens for incoming connections. Each request is processed based on its
+ * opcode in `execute_request()`, ensuring efficient remote file system
+ * interactions.
+ */
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
@@ -202,8 +224,6 @@ void execute_request(request *req, int sessfd) {
 }
 
 int main(int argc, char **argv) {
-  // char *msg="Hello from server";
-  // char buf[MAXMSGLEN+1];
   char *serverport;
   unsigned short port;
   int sockfd, sessfd, rv;
@@ -267,9 +287,6 @@ int main(int argc, char **argv) {
       exit(0);
     }
   }
-
-  // printf("server shutting down cleanly\n");
-  // close socket
   close(sockfd);
 
   return 0;

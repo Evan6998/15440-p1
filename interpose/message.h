@@ -1,3 +1,24 @@
+/**
+ * @file message.h
+ * @brief Defines the message structures for an RPC-based file system service.
+ *
+ * This file contains the request and response message formats used in an
+ * RPC protocol for remote file operations over TCP. The protocol supports
+ * standard file operations such as open, read, write, close, seek, stat,
+ * unlink, and directory traversal.
+ *
+ * Structures:
+ * - `request`: Encapsulates a request header and the corresponding payload.
+ * - `req_header`: Common request header with opcode and payload details.
+ * - `req_union`: Union of different request types.
+ *
+ * - `response`: Encapsulates a response header and the corresponding result.
+ * - `response_header`: Common response header with error handling.
+ * - `res_union`: Union of different response types.
+ *
+ * Each request and response structure ensures proper serialization and
+ * deserialization for efficient communication between client and server.
+ */
 #include <sys/types.h>
 
 enum OPCODE {
